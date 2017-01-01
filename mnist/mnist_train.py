@@ -35,18 +35,54 @@ training_data = training_data[tr_ind == 1,:]
 training_labels = training_labels[tr_ind == 1]
 
 
+#%%
+
+
+in_dim = training_data.shape[1]
+out_dim = training_labels.shape[1]
+
+hidden_layer_1_dim = 20
+
 
 #%% Define the graph and run
 
 
+
 with tf.Graph().as_default():
     
-    # Create the model
     x = tf.placeholder(tf.float32, [None, training_data.shape[1]])
-    W = tf.Variable(tf.zeros([training_data.shape[1], training_labels.shape[1]]))
-    b = tf.Variable(tf.zeros([training_labels.shape[1]]))
-    y = tf.matmul(x, W) + b
+    
+#    with tf.variable_scope('layer'):
+#        # Create the model
+#        x = tf.placeholder(tf.float32, [None, training_data.shape[1]])
+#        W = tf.Variable(tf.zeros([training_data.shape[1], training_labels.shape[1]]))
+#        b = tf.Variable(tf.zeros([training_labels.shape[1]]))
+#        y = tf.matmul(x, W) + b
 
+    
+    with tf.name_scope('hidden_layer_1'):
+        w = tf.Variable(tf.truncated_normal([in_dim, hidden_layer_1_dim], 
+                                            stddev=1.0 / math.sqrt(float(D))),
+                        name='weights')
+                        
+        b = tf.Variable(tf.zeros([hidden_layer_1_dim]), 
+                        name = 'biases')
+        
+#        hidden1 = tf.nn.relu(tf.matmul(feature_placeholder, w) + b)
+        hidden_layer_1 = (tf.matmul(x, w) + b)
+    
+    # linear output layer
+    with tf.name_scope('output_layer'):
+        w = tf.Variable(tf.truncated_normal([hidden_layer_1_dim, out_dim], 
+                                            stddev=1.0 / math.sqrt(float(hidden_layer_1_dim))),
+                        name='weights')
+                        
+        b = tf.Variable(tf.zeros([out_dim]), 
+                        name = 'biases')
+        
+        y = tf.matmul(hidden_layer_1, w) + b
+    
+    
     # Define loss and optimizer
     y_ = tf.placeholder(tf.float32, [None, training_labels.shape[1]])
 
@@ -64,10 +100,10 @@ with tf.Graph().as_default():
         
         # Train
         tf.global_variables_initializer().run()
-        for i in range(5000):
+        for i in range(1000):
             sess.run(train_step, feed_dict={x: training_data, y_: training_labels})
         
-            if (i % 100 == 0) or (i == 9999):
+            if (i % 100 == 0) or (i == 999):
                 # Test trained model
                 correct_prediction = tf.equal(tf.argmax(y, 1), tf.argmax(y_, 1))
                 accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
