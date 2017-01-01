@@ -9,7 +9,7 @@ based on https://raw.githubusercontent.com/tensorflow/tensorflow/r0.12/tensorflo
 
 """
 
-
+import math
 import numpy as np
 import pandas as pd
 
@@ -19,20 +19,15 @@ import tensorflow as tf
 
 #%% read in data
 
-training_data, training_labels = input('t10k-images.idx3-ubyte', 't10k-labels.idx1-ubyte', reshape_to_image = False)
+#training_data, training_labels = input('t10k-images.idx3-ubyte', 't10k-labels.idx1-ubyte', reshape_to_image = False)
 
-
-training_labels = pd.get_dummies(training_labels).as_matrix().astype(np.float32)
+data = Mnist('t10k-images.idx3-ubyte', 't10k-labels.idx1-ubyte', reshape_to_image = False, labels_to_dummies = True)
 
 
 #%% split to training and testing datasets
 
-tr_ind = np.random.rand(len(training_data)) < 0.8
-
-testing_data = training_data[tr_ind == 0,:]
-testing_labels = training_labels[tr_ind == 0] 
-training_data = training_data[tr_ind == 1,:]
-training_labels = training_labels[tr_ind == 1]
+training_data, training_labels = data.get_train_data()
+# training_data_sample, training_labels_sample = data.get_random_sample()
 
 
 #%%
@@ -62,7 +57,7 @@ with tf.Graph().as_default():
     
     with tf.name_scope('hidden_layer_1'):
         w = tf.Variable(tf.truncated_normal([in_dim, hidden_layer_1_dim], 
-                                            stddev=1.0 / math.sqrt(float(D))),
+                                            stddev=1.0 / math.sqrt(float(in_dim))),
                         name='weights')
                         
         b = tf.Variable(tf.zeros([hidden_layer_1_dim]), 
