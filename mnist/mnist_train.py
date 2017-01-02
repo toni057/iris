@@ -33,7 +33,6 @@ testing_data, testing_labels = data.get_test_data()
 
 #%%
 
-
 in_dim = training_data.shape[1]
 out_dim = training_labels.shape[1]
 
@@ -69,7 +68,7 @@ def simple_nnet(x):
     
     Output is linear.
     """
-    # hidden layer 1
+    # hidden layer 1 (sigmoid)
     with tf.variable_scope('hidden_layer_1'):
 #        w = tf.Variable(tf.truncated_normal([in_dim, hidden_layer_1_dim], 
 #                                            stddev=1.0 / math.sqrt(float(in_dim))),
@@ -85,12 +84,12 @@ def simple_nnet(x):
                                    shape = [hidden_layer_1_dim],
                                    initializer = tf.constant_initializer(0.0))
     
-#        hidden_layer_1 = tf.nn.relu(tf.matmul(x, w) + b)
+        hidden_layer_1 = tf.nn.relu(tf.matmul(x, w) + b)
         hidden_layer_1 = tf.nn.sigmoid(tf.matmul(x, w) + b)
 #        hidden_layer_1 = (tf.matmul(x, w) + b)
 
 
-    # hidden layer 2
+    # hidden layer 2 (linear)
     with tf.variable_scope('hidden_layer_2'):
         w = create_variable_on_cpu(name='weights', 
                                    shape=[hidden_layer_1_dim, hidden_layer_2_dim],
@@ -120,7 +119,8 @@ def simple_nnet(x):
 
 def loss(y, y_):
     cross_entropy = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(y, y_))
-    return cross_entropy 
+    loss = tf.reduce_mean(cross_entropy, name='xentropy_mean')
+    return loss 
 
 #%% Define the graph and run
 
@@ -136,21 +136,33 @@ with tf.Graph().as_default():
     # define goal function and the optimizer
     cross_entropy = loss(y, y_)
 
-    train_step = tf.train.GradientDescentOptimizer(.02).minimize(cross_entropy)
     
+    # summary snapshot
+#    tf.summary.scalar('loss', loss)
+    # optimizer
+    optimizer = tf.train.GradientDescentOptimizer(.02).minimize(cross_entropy)
+    
+    
+    # summary tensor
+    summary = tf.summary.merge_all()
     
     # global variable initializer
     init = tf.global_variables_initializer()
     
     # create a session and run session to initialize variables
     with tf.Session() as sess:
+        
+        # Instantiate a SummaryWriter to output summaries and the Graph.
+#        summary_writer = tf.train.SummaryWriter('/home/tb/Desktop/Data/mnist', sess.graph)
+    
+    
         sess.run(init)
         
         # Train
         tf.global_variables_initializer().run()
         for i in range(num_iter):
             training_data_sample, training_labels_sample = data.get_random_sample()
-            sess.run(train_step, feed_dict={x: training_data_sample, y_: training_labels_sample})
+            sess.run(optimizer, feed_dict={x: training_data_sample, y_: training_labels_sample})
             
             # print first iteration diagnostics and then every 100 iterations
             if ((i+1) % 100 == 0) or (i == 0):
