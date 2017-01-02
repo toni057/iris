@@ -74,6 +74,10 @@ class Mnist():
             return self.images[self.tr_ind,:], self.labels[self.tr_ind,:]
         else:
             return self.images, self.labels
+            
+    
+    def get_test_data(self):
+        return self.images[~self.tr_ind,:], self.labels[~self.tr_ind,:]
     
 
 def plot(image, revert = True):
