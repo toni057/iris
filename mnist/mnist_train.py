@@ -36,8 +36,8 @@ testing_data, testing_labels = data.get_test_data()
 in_dim = training_data.shape[1]
 out_dim = training_labels.shape[1]
 
-hidden_layer_1_dim = 30
-hidden_layer_2_dim = 20
+hidden_layer_1_dim = 100
+hidden_layer_2_dim = 50
 
 num_iter = 1000
 
@@ -120,7 +120,8 @@ def simple_nnet(x):
 def loss(y, y_):
     cross_entropy = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(y, y_))
     loss = tf.reduce_mean(cross_entropy, name='xentropy_mean')
-    return loss 
+    return loss
+
 
 #%% Define the graph and run
 
@@ -128,6 +129,7 @@ with tf.Graph().as_default():
     
     x = tf.placeholder(tf.float32, [None, training_data.shape[1]])
     
+    # y holds the neural net calc
     y = simple_nnet(x)
     
     # Define loss and optimizer
@@ -138,7 +140,7 @@ with tf.Graph().as_default():
 
     
     # summary snapshot
-#    tf.summary.scalar('loss', loss)
+    tf.summary.scalar(name='loss', tensor=cross_entropy)
     # optimizer
     optimizer = tf.train.GradientDescentOptimizer(.02).minimize(cross_entropy)
     
@@ -152,10 +154,11 @@ with tf.Graph().as_default():
     # create a session and run session to initialize variables
     with tf.Session() as sess:
         
+        
         # Instantiate a SummaryWriter to output summaries and the Graph.
-#        summary_writer = tf.train.SummaryWriter('/home/tb/Desktop/Data/mnist', sess.graph)
-    
-    
+        summary_writer = tf.summary.FileWriter('/home/tb/Desktop/Data/mnist', sess.graph)
+
+        
         sess.run(init)
         
         # Train
