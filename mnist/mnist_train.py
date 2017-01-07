@@ -37,29 +37,61 @@ testing_data, testing_labels = data.get_test_data()
 in_dim = training_data.shape[1]
 out_dim = training_labels.shape[1]
 
-hidden_layer_1_dim = 20
-hidden_layer_2_dim = 20
+hidden_layer_1_dim = 100
+hidden_layer_2_dim = 80
+hidden_layer_3_dim = 40
+hidden_layer_4_dim = 20
+hidden_layer_5_dim = 100
 
-num_iter = 1000
+num_iter = 2000
 
 
 #%%
 
 def create_variable_on_cpu(name, shape, initializer):
-  """Helper to create a Variable stored on CPU memory.
+    """Helper to create a Variable stored on CPU memory.
 
-  Args:
-    name: name of the variable
-    shape: list of ints
-    initializer: initializer for Variable
+    Args:
+      name: name of the variable
+      shape: list of ints
+      initializer: initializer for Variable
 
-  Returns:
-    Variable Tensor
-  """
-  with tf.device('/cpu:0'):
-    var = tf.get_variable(name, shape, initializer=initializer, dtype=tf.float32)
-  return var
+    Returns:
+      Variable Tensor
+    """
+    with tf.device('/cpu:0'):
+        var = tf.get_variable(name, shape, initializer=initializer, dtype=tf.float32)
+    return var
 
+
+def create_layer(name, x, in_dim, out_dim, activation = 'relu'):
+    """
+    
+    """
+    with tf.variable_scope(name):
+
+        w = create_variable_on_cpu(name='weights', 
+                                   shape=[in_dim, out_dim],
+                                   initializer=tf.truncated_normal_initializer(stddev=1.0 / math.sqrt(float(in_dim)), 
+                                   dtype=tf.float32))
+        b = create_variable_on_cpu(name='bias',
+                                   shape = [out_dim],
+                                   initializer = tf.constant_initializer(0.0))
+    
+        # output = tf.nn.relu(tf.matmul(x, w) + b)
+        # hidden_layer_1 = tf.nn.sigmoid(tf.matmul(x, w) + b)
+        # hidden_layer_1 = (tf.matmul(x, w) + b)
+        
+        if activation == 'relu':
+            output = tf.nn.relu(tf.matmul(x, w) + b)
+        elif activation == 'sigmoid':
+            output = tf.nn.sigmoid(tf.matmul(x, w) + b)
+        elif activation == 'linear':
+            output = tf.matmul(x, w) + b
+
+        return output
+    
+    
 
 #%% simple neural net with flattened features
 
@@ -69,47 +101,25 @@ def simple_nnet(x):
     
     Output is linear.
     """
-    # hidden layer 1 (sigmoid)
-    with tf.variable_scope('hidden_layer_1'):
+    # hidden layer 1
+    hl_1 = create_layer('hidden_layer_1', x, in_dim, hidden_layer_1_dim, 'relu')
 
-        w = create_variable_on_cpu(name='weights', 
-                                   shape=[in_dim, hidden_layer_1_dim],
-                                   initializer=tf.truncated_normal_initializer(stddev=1.0 / math.sqrt(float(in_dim)), 
-                                   dtype=tf.float32))
-        b = create_variable_on_cpu(name='bias',
-                                   shape = [hidden_layer_1_dim],
-                                   initializer = tf.constant_initializer(0.0))
+    # hidden layer 2
+    hl_2 = create_layer('hidden_layer_2', hl_1 , hidden_layer_1_dim, hidden_layer_2_dim, 'relu')
     
-        # hidden_layer_1 = tf.nn.relu(tf.matmul(x, w) + b)
-        hidden_layer_1 = tf.nn.sigmoid(tf.matmul(x, w) + b)
-        # hidden_layer_1 = (tf.matmul(x, w) + b)
+    # hidden layer 3
+    hl_3 = create_layer('hidden_layer_3', hl_2 , hidden_layer_2_dim, hidden_layer_3_dim, 'relu')
 
+    # hidden layer 4
+    hl_4 = create_layer('hidden_layer_4', hl_3, hidden_layer_3_dim, hidden_layer_4_dim, 'relu')
 
-    # hidden layer 2 (linear)
-    with tf.variable_scope('hidden_layer_2'):
-        w = create_variable_on_cpu(name='weights', 
-                                   shape=[hidden_layer_1_dim, hidden_layer_2_dim],
-                                   initializer=tf.truncated_normal_initializer(stddev=1.0 / math.sqrt(float(hidden_layer_1_dim)), 
-                                   dtype=tf.float32))
-        b = create_variable_on_cpu(name='bias',
-                                   shape = [hidden_layer_2_dim],
-                                   initializer = tf.constant_initializer(0.0))
+    # hidden layer 5
+    hl_5 = create_layer('hidden_layer_5', hl_4, hidden_layer_4_dim, hidden_layer_5_dim, 'linear')
+
+    # output layer 5
+    y = create_layer('output', hl_5, hidden_layer_5_dim, out_dim, 'linear')
+
     
-        hidden_layer_2 = (tf.matmul(hidden_layer_1, w) + b)
-
-        
-    # linear output layer
-    with tf.variable_scope('output_layer'):
-        w = create_variable_on_cpu(name='weights', 
-                                   shape=[hidden_layer_2_dim, out_dim],
-                                   initializer=tf.truncated_normal_initializer(stddev=1.0 / math.sqrt(float(hidden_layer_2_dim)), 
-                                   dtype=tf.float32))
-        b = create_variable_on_cpu(name='bias',
-                                   shape = [out_dim],
-                                   initializer = tf.constant_initializer(0.0))
-    
-        y = (tf.matmul(hidden_layer_2, w) + b)
-        
     return y
 
 
@@ -138,9 +148,10 @@ with tf.Graph().as_default():
     
     # summary snapshot
     tf.summary.scalar(name='loss', tensor=cross_entropy)
-    # optimizer
-    optimizer = tf.train.GradientDescentOptimizer(.02).minimize(cross_entropy)
     
+    # optimizer
+    optimizer = tf.train.GradientDescentOptimizer(.005).minimize(cross_entropy)
+    # optimizer = tf.train.AdamOptimizer(.01).minimize(cross_entropy)
     
     # summary tensor
     summary = tf.summary.merge_all()
@@ -270,10 +281,10 @@ with tf.Graph().as_default():
         for i in range(1000):
             batch = data.get_random_sample2()
             
-            if i % 1 == 0:
+            if i % 10 == 0:
                 train_accuracy = accuracy.eval(feed_dict={x:batch[0], y_: batch[1], keep_prob: 1.0})
                 print("step %d, training accuracy %g"%(i, train_accuracy))
-              
+            
             train_step.run(feed_dict={x: batch[0], y_: batch[1], keep_prob: 0.5})
         
             print("test accuracy %g"%accuracy.eval(feed_dict={
