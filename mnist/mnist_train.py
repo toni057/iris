@@ -268,21 +268,22 @@ with tf.Graph().as_default():
     
     training_data, training_labels = data.get_train_data2()
     
-    x = tf.placeholder(tf.float32, [None, 28, 28, 1])
+    with tf.device('/gpu:1'):
+        x = tf.placeholder(tf.float32, [None, 28, 28, 1])
+        
+        # y holds the neural net calc
+        y_conv = cnn(x)
+        
+        # Define loss and optimizer
+        y_ = tf.placeholder(tf.float32, [None, training_labels.shape[1]])
     
-    # y holds the neural net calc
-    y_conv = cnn(x)
+        # learning rate placeholder
+        lr = tf.placeholder(tf.float32)
     
-    # Define loss and optimizer
-    y_ = tf.placeholder(tf.float32, [None, training_labels.shape[1]])
-
-    # learning rate placeholder
-    lr = tf.placeholder(tf.float32)
-
-    cross_entropy = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(y_conv, y_))
-    train_step = tf.train.AdamOptimizer(lr).minimize(cross_entropy)
-    correct_prediction = tf.equal(tf.argmax(y_conv,1), tf.argmax(y_,1))
-    accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
+        cross_entropy = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(y_conv, y_))
+        train_step = tf.train.AdamOptimizer(lr).minimize(cross_entropy)
+        correct_prediction = tf.equal(tf.argmax(y_conv,1), tf.argmax(y_,1))
+        accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
     
     # learning rate parameters
     c1 = 0.002
