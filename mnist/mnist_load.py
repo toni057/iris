@@ -109,7 +109,7 @@ class Mnist():
 
 
 
-data = Mnist('train-images.idx3-ubyte', 'train-labels.idx1-ubyte')
-images, labels = (data.images, data.labels)
-data.plot(12)
+#data = Mnist('train-images.idx3-ubyte', 'train-labels.idx1-ubyte')
+#images, labels = (data.images, data.labels)
+#data.plot(12)
 
