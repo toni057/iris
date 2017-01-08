@@ -64,7 +64,7 @@ def create_variable_on_cpu(name, shape, initializer):
     return var
 
 
-def fully_connecter_layer(name, x, in_dim, out_dim, activation = 'relu'):
+def fully_connecter_layer(name, x, in_dim, out_dim, activation='relu', keep_prob=None):
     """
     Create fully connected layer.
     """
@@ -78,9 +78,6 @@ def fully_connecter_layer(name, x, in_dim, out_dim, activation = 'relu'):
                                    shape = [out_dim],
                                    initializer = tf.constant_initializer(0.0))
     
-        # output = tf.nn.relu(tf.matmul(x, w) + b)
-        # hidden_layer_1 = tf.nn.sigmoid(tf.matmul(x, w) + b)
-        # hidden_layer_1 = (tf.matmul(x, w) + b)
         linear = tf.matmul(x, w) + b
 
         if activation == 'relu':
@@ -91,6 +88,9 @@ def fully_connecter_layer(name, x, in_dim, out_dim, activation = 'relu'):
             output = tf.nn.softmax(linear)
         elif activation == 'linear':
             output = linear
+            
+        if keep_prob is not None:
+            output = tf.nn.dropout(output, keep_prob)
 
     return output
     
@@ -208,7 +208,7 @@ def max_pool_2x2(x):
                           strides=[1, 2, 2, 1], padding='SAME')
 
 
-def conv_layer(name, x, filter_shape, stride=1, activation = 'relu'):
+def conv_layer(name, x, filter_shape, stride=1, activation='relu', keep_prob=None):
     """
     Create fully connected layer.
     
@@ -216,6 +216,7 @@ def conv_layer(name, x, filter_shape, stride=1, activation = 'relu'):
     x
     name
     stride
+    keep_prob
     """
     with tf.variable_scope(name):
 
@@ -225,8 +226,13 @@ def conv_layer(name, x, filter_shape, stride=1, activation = 'relu'):
         b = create_variable_on_cpu(name='bias',
                                    shape = filter_shape[3],
                                    initializer = tf.constant_initializer(0.0))
-    
+        
         conv = tf.nn.conv2d(x, w, strides=[1, stride, stride, 1], padding='SAME') + b
+        
+#        with tf.device('/cpu:0'):
+        mean, variance = tf.nn.moments(conv, [0, 1, 2], name='moment')
+        
+        tf.nn.batch_normalization(conv, mean, variance, b, None, 1e-5)
 
         if activation == 'relu':
             output = tf.nn.relu(conv)
@@ -235,10 +241,13 @@ def conv_layer(name, x, filter_shape, stride=1, activation = 'relu'):
         elif activation == 'linear':
             output = conv
 
+        if keep_prob is not None:
+            output = tf.nn.dropout(output, keep_prob)
+        
     return output
 
 
-def cnn(x):
+def cnn(x, keep_prob):
     """
     Build the convolutional neural net.
     
@@ -250,12 +259,13 @@ def cnn(x):
     M = 24  # third convolutional layer output depth
     N = 200  # fully connected layer
     
+    
     cl_1 = conv_layer('conv_layer_1', x, [6, 6, 1, K], stride=1)
     cl_2 = conv_layer('conv_layer_2', cl_1 , [5, 5, K, L], stride=2)
     cl_3 = conv_layer('conv_layer_3', cl_2 , [4, 4, L, M], stride=2)
     
     cl3_flattened = tf.reshape(cl_3, shape=[-1, 7 * 7 * M])
-    hl_1 = fully_connecter_layer('fully_connected_layer_1', cl3_flattened, 7 * 7 * M, N, 'relu')
+    hl_1 = fully_connecter_layer('fully_connected_layer_1', cl3_flattened, 7 * 7 * M, N, 'relu', keep_prob)
     output = fully_connecter_layer('output_layer', hl_1, N, 10, 'softmax')
     
 
@@ -269,16 +279,18 @@ with tf.Graph().as_default():
     training_data, training_labels = data.get_train_data2()
     
     with tf.device('/gpu:1'):
-        x = tf.placeholder(tf.float32, [None, 28, 28, 1])
+        x = tf.placeholder(dtype=tf.float32, shape=[None, 28, 28, 1], name='x')
+        
+        keep_prob = tf.placeholder(dtype=tf.float32, name='keep_prob')
         
         # y holds the neural net calc
-        y_conv = cnn(x)
+        y_conv = cnn(x, keep_prob)
         
         # Define loss and optimizer
-        y_ = tf.placeholder(tf.float32, [None, training_labels.shape[1]])
+        y_ = tf.placeholder(dtype=tf.float32, shape=[None, training_labels.shape[1]], name='y_')
     
         # learning rate placeholder
-        lr = tf.placeholder(tf.float32)
+        lr = tf.placeholder(tf.float32, name='lr')
     
         cross_entropy = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(y_conv, y_))
         train_step = tf.train.AdamOptimizer(lr).minimize(cross_entropy)
@@ -286,29 +298,30 @@ with tf.Graph().as_default():
         accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
     
     # learning rate parameters
-    c1 = 0.002
-    c2 = -0.001
-    t1 = 0.0004
-    t2 = 0.0008
+    max_lr = 0.0001
+    min_lr = 0.00001
+    T = 0.0005
     
+    # add soft placement for sessions (specifically to solve gpu placement issue of tf.nn.moments)
+    config = tf.ConfigProto(allow_soft_placement=True)
     # create a session and run session to initialize variables
-    with tf.Session() as sess:
+    with tf.Session(config=config) as sess:
         
         sess.run(tf.global_variables_initializer())
     
         for i in range(10000):
             batch = data.get_random_sample2()
             
-            learning_rate = c1 * math.exp(-i * t1) + c2 * math.exp(-i * t2)
+            learning_rate = min_lr + (max_lr - min_lr) * math.exp(-i * T) 
             
             if i % 100 == 0:
-                train_accuracy = accuracy.eval(feed_dict={x:batch[0], y_: batch[1]})
+                train_accuracy = accuracy.eval(feed_dict={x:batch[0], y_: batch[1], keep_prob: 1})
                 print("step %d, training accuracy %g"%(i, train_accuracy))
             
                 print("test accuracy %g"%accuracy.eval(feed_dict={
-                    x: data.get_test_data2()[0], y_: data.get_test_data2()[1]}))
+                    x: data.get_test_data2()[0], y_: data.get_test_data2()[1], keep_prob: 1}))
 
-            train_step.run(feed_dict={x: batch[0], y_: batch[1], lr: learning_rate})    
+            train_step.run(feed_dict={x: batch[0], y_: batch[1], lr: learning_rate, keep_prob: 0.75})    
     
     
     
