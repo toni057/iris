@@ -9,27 +9,27 @@ based on google's tensorflow example
 
 """
 
-import math
+import os
+os.chdir('/home/tb/Desktop/Git/tensorflow/mnist')
 
+import numpy as np
+import math
 import tensorflow as tf
 
-
+import mnist_load
 
 #%% read in data
 
-filename_images = 'train-images.idx3-ubyte'
-filename_labels = 'train-labels.idx1-ubyte'
+filename_images = '/home/tb/Desktop/Data/mnist/train-images.idx3-ubyte'
+filename_labels = '/home/tb/Desktop/Data/mnist/train-labels.idx1-ubyte'
 
-#training_data, training_labels = input('t10k-images.idx3-ubyte', 't10k-labels.idx1-ubyte', reshape_to_image = False)
-
-data = Mnist(filename_images, filename_labels, labels_to_dummies = True)
+data = mnist_load.Mnist(filename_images, filename_labels, labels_to_dummies = True)
 
 
 #%% split to training and testing datasets
 
 training_data, training_labels = data.get_train_data()
 testing_data, testing_labels = data.get_test_data()
-# training_data_sample, training_labels_sample = data.get_random_sample()
 
 
 #%%
@@ -64,9 +64,9 @@ def create_variable_on_cpu(name, shape, initializer):
     return var
 
 
-def create_layer(name, x, in_dim, out_dim, activation = 'relu'):
+def fully_connecter_layer(name, x, in_dim, out_dim, activation = 'relu'):
     """
-    
+    Create fully connected layer.
     """
     with tf.variable_scope(name):
 
@@ -81,15 +81,18 @@ def create_layer(name, x, in_dim, out_dim, activation = 'relu'):
         # output = tf.nn.relu(tf.matmul(x, w) + b)
         # hidden_layer_1 = tf.nn.sigmoid(tf.matmul(x, w) + b)
         # hidden_layer_1 = (tf.matmul(x, w) + b)
-        
-        if activation == 'relu':
-            output = tf.nn.relu(tf.matmul(x, w) + b)
-        elif activation == 'sigmoid':
-            output = tf.nn.sigmoid(tf.matmul(x, w) + b)
-        elif activation == 'linear':
-            output = tf.matmul(x, w) + b
+        linear = tf.matmul(x, w) + b
 
-        return output
+        if activation == 'relu':
+            output = tf.nn.relu(linear)
+        elif activation == 'sigmoid':
+            output = tf.nn.sigmoid(linear)
+        elif activation == 'softmax':
+            output = tf.nn.softmax(linear)
+        elif activation == 'linear':
+            output = linear
+
+    return output
     
     
 
@@ -102,22 +105,22 @@ def simple_nnet(x):
     Output is linear.
     """
     # hidden layer 1
-    hl_1 = create_layer('hidden_layer_1', x, in_dim, hidden_layer_1_dim, 'relu')
+    hl_1 = fully_connecter_layer('hidden_layer_1', x, in_dim, hidden_layer_1_dim, 'relu')
 
     # hidden layer 2
-    hl_2 = create_layer('hidden_layer_2', hl_1 , hidden_layer_1_dim, hidden_layer_2_dim, 'relu')
+    hl_2 = fully_connecter_layer('hidden_layer_2', hl_1 , hidden_layer_1_dim, hidden_layer_2_dim, 'relu')
     
     # hidden layer 3
-    hl_3 = create_layer('hidden_layer_3', hl_2 , hidden_layer_2_dim, hidden_layer_3_dim, 'relu')
+    hl_3 = fully_connecter_layer('hidden_layer_3', hl_2 , hidden_layer_2_dim, hidden_layer_3_dim, 'relu')
 
     # hidden layer 4
-    hl_4 = create_layer('hidden_layer_4', hl_3, hidden_layer_3_dim, hidden_layer_4_dim, 'relu')
+    hl_4 = fully_connecter_layer('hidden_layer_4', hl_3, hidden_layer_3_dim, hidden_layer_4_dim, 'relu')
 
     # hidden layer 5
-    hl_5 = create_layer('hidden_layer_5', hl_4, hidden_layer_4_dim, hidden_layer_5_dim, 'linear')
+    hl_5 = fully_connecter_layer('hidden_layer_5', hl_4, hidden_layer_4_dim, hidden_layer_5_dim, 'linear')
 
     # output layer 5
-    y = create_layer('output', hl_5, hidden_layer_5_dim, out_dim, 'linear')
+    y = fully_connecter_layer('output', hl_5, hidden_layer_5_dim, out_dim, 'linear')
 
     
     return y
@@ -205,53 +208,61 @@ def max_pool_2x2(x):
                           strides=[1, 2, 2, 1], padding='SAME')
 
 
-def cnn(x_image):
+def conv_layer(name, x, filter_shape, stride=1, activation = 'relu'):
+    """
+    Create fully connected layer.
+    
+    filter_shape
+    x
+    name
+    stride
+    """
+    with tf.variable_scope(name):
+
+        w = create_variable_on_cpu(name='weights', 
+                                   shape=filter_shape,
+                                   initializer=tf.truncated_normal_initializer(stddev=0.1))
+        b = create_variable_on_cpu(name='bias',
+                                   shape = filter_shape[3],
+                                   initializer = tf.constant_initializer(0.0))
+    
+        conv = tf.nn.conv2d(x, w, strides=[1, stride, stride, 1], padding='SAME') + b
+
+        if activation == 'relu':
+            output = tf.nn.relu(conv)
+        elif activation == 'sigmoid':
+            output = tf.nn.sigmoid(conv)
+        elif activation == 'linear':
+            output = conv
+
+    return output
+
+
+def cnn(x):
     """
     Build the convolutional neural net.
     
     Output is linear.
     """
     
-    # first convolution layer
-    W_conv1 = weight_variable([5, 5, 1, 32])
-    b_conv1 = bias_variable([32])
+    K = 6  # first convolutional layer output depth
+    L = 12  # second convolutional layer output depth
+    M = 24  # third convolutional layer output depth
+    N = 200  # fully connected layer
     
-    x_image = tf.reshape(x, [-1,28,28,1])
+    cl_1 = conv_layer('conv_layer_1', x, [6, 6, 1, K], stride=1)
+    cl_2 = conv_layer('conv_layer_2', cl_1 , [5, 5, K, L], stride=2)
+    cl_3 = conv_layer('conv_layer_3', cl_2 , [4, 4, L, M], stride=2)
     
-    h_conv1 = tf.nn.relu(conv2d(x_image, W_conv1) + b_conv1)
-    h_pool1 = max_pool_2x2(h_conv1)
+    cl3_flattened = tf.reshape(cl_3, shape=[-1, 7 * 7 * M])
+    hl_1 = fully_connecter_layer('fully_connected_layer_1', cl3_flattened, 7 * 7 * M, N, 'relu')
+    output = fully_connecter_layer('output_layer', hl_1, N, 10, 'softmax')
+    
 
-    # second convolution layer
-    W_conv2 = weight_variable([5, 5, 32, 64])
-    b_conv2 = bias_variable([64])
-    
-    h_conv2 = tf.nn.relu(conv2d(h_pool1, W_conv2) + b_conv2)
-    h_pool2 = max_pool_2x2(h_conv2)
-    
-    
-    # densely connected layer
-    W_fc1 = weight_variable([7 * 7 * 64, 1024])
-    b_fc1 = bias_variable([1024])
-    
-    h_pool2_flat = tf.reshape(h_pool2, [-1, 7*7*64])
-    h_fc1 = tf.nn.relu(tf.matmul(h_pool2_flat, W_fc1) + b_fc1)
-
-    # dropout
-    keep_prob = tf.placeholder(tf.float32)
-    h_fc1_drop = tf.nn.dropout(h_fc1, keep_prob)
-
-
-    # readout layer    
-    W_fc2 = weight_variable([1024, 10])
-    b_fc2 = bias_variable([10])
-    
-    y_conv = tf.matmul(h_fc1_drop, W_fc2) + b_fc2
-    
-    return y_conv, keep_prob
+    return output
 
 
 #%%
-
 
 with tf.Graph().as_default():
     
@@ -260,38 +271,43 @@ with tf.Graph().as_default():
     x = tf.placeholder(tf.float32, [None, 28, 28, 1])
     
     # y holds the neural net calc
-    y_conv, keep_prob = cnn(x)
+    y_conv = cnn(x)
     
     # Define loss and optimizer
     y_ = tf.placeholder(tf.float32, [None, training_labels.shape[1]])
 
-    
+    # learning rate placeholder
+    lr = tf.placeholder(tf.float32)
+
     cross_entropy = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(y_conv, y_))
-    train_step = tf.train.AdamOptimizer(1e-4).minimize(cross_entropy)
+    train_step = tf.train.AdamOptimizer(lr).minimize(cross_entropy)
     correct_prediction = tf.equal(tf.argmax(y_conv,1), tf.argmax(y_,1))
     accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
     
-    
+    # learning rate parameters
+    c1 = 0.002
+    c2 = -0.001
+    t1 = 0.0004
+    t2 = 0.0008
     
     # create a session and run session to initialize variables
     with tf.Session() as sess:
         
         sess.run(tf.global_variables_initializer())
     
-        for i in range(1000):
+        for i in range(10000):
             batch = data.get_random_sample2()
             
-            if i % 10 == 0:
-                train_accuracy = accuracy.eval(feed_dict={x:batch[0], y_: batch[1], keep_prob: 1.0})
+            learning_rate = c1 * math.exp(-i * t1) + c2 * math.exp(-i * t2)
+            
+            if i % 100 == 0:
+                train_accuracy = accuracy.eval(feed_dict={x:batch[0], y_: batch[1]})
                 print("step %d, training accuracy %g"%(i, train_accuracy))
             
-            train_step.run(feed_dict={x: batch[0], y_: batch[1], keep_prob: 0.5})
-        
-            print("test accuracy %g"%accuracy.eval(feed_dict={
-                x: data.get_test_data2()[0], y_: data.get_test_data2()[1], keep_prob: 1.0}))
+                print("test accuracy %g"%accuracy.eval(feed_dict={
+                    x: data.get_test_data2()[0], y_: data.get_test_data2()[1]}))
 
-    
-    
+            train_step.run(feed_dict={x: batch[0], y_: batch[1], lr: learning_rate})    
     
     
     
