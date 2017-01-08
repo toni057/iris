@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 Created on Tue Dec  6 20:29:02 2016
 
@@ -272,6 +270,30 @@ def cnn(x, keep_prob):
     return output
 
 
+class LR():
+    """
+    Learning rate class
+    
+    Parameters
+    ----------
+    min_lr : minimum learning rate value
+    max_lr : maximum learning rate value
+    T : time constant
+    """
+    def __init__(self, min_lr, max_lr, T):
+        self.min_lr = min_lr
+        self.max_lr = max_lr
+        self.T = T
+    
+    def get_lr(self, i):
+        """
+        Get the learning rate at iteration i.
+        Parameters
+        ----------
+        i : iteration
+        """
+        return self.min_lr + (self.max_lr - self.min_lr) * math.exp(-i * self.T)
+    
 #%%
 
 with tf.Graph().as_default():
@@ -297,10 +319,12 @@ with tf.Graph().as_default():
         correct_prediction = tf.equal(tf.argmax(y_conv,1), tf.argmax(y_,1))
         accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
     
+
     # learning rate parameters
     max_lr = 0.0001
     min_lr = 0.00001
     T = 0.0005
+    learning_rate = LR(min_lr, max_lr, T)
     
     # add soft placement for sessions (specifically to solve gpu placement issue of tf.nn.moments)
     config = tf.ConfigProto(allow_soft_placement=True)
@@ -312,8 +336,6 @@ with tf.Graph().as_default():
         for i in range(10000):
             batch = data.get_random_sample2()
             
-            learning_rate = min_lr + (max_lr - min_lr) * math.exp(-i * T) 
-            
             if i % 100 == 0:
                 train_accuracy = accuracy.eval(feed_dict={x:batch[0], y_: batch[1], keep_prob: 1})
                 print("step %d, training accuracy %g"%(i, train_accuracy))
@@ -321,7 +343,7 @@ with tf.Graph().as_default():
                 print("test accuracy %g"%accuracy.eval(feed_dict={
                     x: data.get_test_data2()[0], y_: data.get_test_data2()[1], keep_prob: 1}))
 
-            train_step.run(feed_dict={x: batch[0], y_: batch[1], lr: learning_rate, keep_prob: 0.75})    
+            train_step.run(feed_dict={x: batch[0], y_: batch[1], lr: learning_rate.get_lr(i), keep_prob: 0.75})    
     
     
     
