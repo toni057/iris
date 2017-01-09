@@ -14,8 +14,8 @@ import numpy as np
 import math
 import tensorflow as tf
 
-import mnist_load
-
+from mnist_load import Mnist
+from layer import Layer
 
 
 filename_images = '/home/tb/Desktop/Data/mnist/train-images.idx3-ubyte'
@@ -23,7 +23,7 @@ filename_labels = '/home/tb/Desktop/Data/mnist/train-labels.idx1-ubyte'
 
 #%% read in data
 
-data = mnist_load.Mnist(filename_images, filename_labels, labels_to_dummies = True)
+data = Mnist(filename_images, filename_labels, labels_to_dummies = True)
 
 
 #%% split to training and testing datasets
@@ -135,59 +135,59 @@ def loss(y, y_):
 
 #%% Define the graph and run
 
-with tf.Graph().as_default():
-    
-    x = tf.placeholder(tf.float32, [None, training_data.shape[1]])
-    
-    # y holds the neural net calc
-    y = simple_nnet(x)
-    
-    # Define loss and optimizer
-    y_ = tf.placeholder(tf.float32, [None, training_labels.shape[1]])
-
-    # define goal function and the optimizer
-    cross_entropy = loss(y, y_)
-
-    
-    # summary snapshot
-    tf.summary.scalar(name='loss', tensor=cross_entropy)
-    
-    # optimizer
-    optimizer = tf.train.GradientDescentOptimizer(.005).minimize(cross_entropy)
-    # optimizer = tf.train.AdamOptimizer(.01).minimize(cross_entropy)
-    
-    # summary tensor
-    summary = tf.summary.merge_all()
-    
-    
-    # create a session and run session to initialize variables
-    with tf.Session() as sess:
-        
-        
-        # Instantiate a SummaryWriter to output summaries and the Graph.
-        summary_writer = tf.summary.FileWriter('/home/tb/Desktop/Data/mnist', sess.graph)
-
-        # global variable initializer
-        sess.run(tf.global_variables_initializer())
-        
-        # Train
-        tf.global_variables_initializer().run()
-        for i in range(num_iter):
-            training_data_sample, training_labels_sample = data.get_random_sample()
-            sess.run(optimizer, feed_dict={x: training_data_sample, y_: training_labels_sample})
-            
-            # print first iteration diagnostics and then every 100 iterations
-            if ((i+1) % 100 == 0) or (i == 0):
-                # Test trained model
-                correct_prediction = tf.equal(tf.argmax(y, 1), tf.argmax(y_, 1))
-                accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
-                
-                print("It. %4d" % (i+1),  "   Train accuracy: ", sess.run(accuracy, 
-                                                                          feed_dict={x: training_data,
-                                                                                     y_: training_labels}),
-                                     "   Test accuracy: ", sess.run(accuracy, 
-                                                                    feed_dict={x: testing_data,
-                                                                               y_: testing_labels}))
+#with tf.Graph().as_default():
+#    
+#    x = tf.placeholder(tf.float32, [None, training_data.shape[1]])
+#    
+#    # y holds the neural net calc
+#    y = simple_nnet(x)
+#    
+#    # Define loss and optimizer
+#    y_ = tf.placeholder(tf.float32, [None, training_labels.shape[1]])
+#
+#    # define goal function and the optimizer
+#    cross_entropy = loss(y, y_)
+#
+#    
+#    # summary snapshot
+#    tf.summary.scalar(name='loss', tensor=cross_entropy)
+#    
+#    # optimizer
+#    optimizer = tf.train.GradientDescentOptimizer(.005).minimize(cross_entropy)
+#    # optimizer = tf.train.AdamOptimizer(.01).minimize(cross_entropy)
+#    
+#    # summary tensor
+#    summary = tf.summary.merge_all()
+#    
+#    
+#    # create a session and run session to initialize variables
+#    with tf.Session() as sess:
+#        
+#        
+#        # Instantiate a SummaryWriter to output summaries and the Graph.
+#        summary_writer = tf.summary.FileWriter('/home/tb/Desktop/Data/mnist', sess.graph)
+#
+#        # global variable initializer
+#        sess.run(tf.global_variables_initializer())
+#        
+#        # Train
+#        tf.global_variables_initializer().run()
+#        for i in range(num_iter):
+#            training_data_sample, training_labels_sample = data.get_random_sample()
+#            sess.run(optimizer, feed_dict={x: training_data_sample, y_: training_labels_sample})
+#            
+#            # print first iteration diagnostics and then every 100 iterations
+#            if ((i+1) % 100 == 0) or (i == 0):
+#                # Test trained model
+#                correct_prediction = tf.equal(tf.argmax(y, 1), tf.argmax(y_, 1))
+#                accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
+#                
+#                print("It. %4d" % (i+1),  "   Train accuracy: ", sess.run(accuracy, 
+#                                                                          feed_dict={x: training_data,
+#                                                                                     y_: training_labels}),
+#                                     "   Test accuracy: ", sess.run(accuracy, 
+#                                                                    feed_dict={x: testing_data,
+#                                                                               y_: testing_labels}))
 
 
 #%% convolutional neural network for classifying mnist images
@@ -219,27 +219,26 @@ def conv_layer(name, x, filter_shape, stride=1, activation='relu', keep_prob=Non
     keep_prob
     """
     with tf.variable_scope(name):
-
         w = create_variable_on_cpu(name='weights', 
-                                   shape=filter_shape,
-                                   initializer=tf.truncated_normal_initializer(stddev=0.1))
+                            shape=filter_shape,
+                            initializer=tf.truncated_normal_initializer(stddev=0.1))
         b = create_variable_on_cpu(name='bias',
-                                   shape = filter_shape[3],
-                                   initializer = tf.constant_initializer(0.0))
+                            shape = filter_shape[3],
+                            initializer = tf.constant_initializer(0.0))
         
-        conv = tf.nn.conv2d(x, w, strides=[1, stride, stride, 1], padding='SAME') + b
+        output = tf.nn.conv2d(x, w, strides=[1, stride, stride, 1], padding='SAME') + b
         
 #        with tf.device('/cpu:0'):
-        mean, variance = tf.nn.moments(conv, [0, 1, 2], name='moment')
+#        mean, variance = tf.nn.moments(conv, [0, 1, 2], name='moment')
         
-        tf.nn.batch_normalization(conv, mean, variance, b, None, 1e-5)
+#        output = tf.nn.batch_normalization(conv, mean, variance, b, None, 1e-5)
 
         if activation == 'relu':
-            output = tf.nn.relu(conv)
+            output = tf.nn.relu(output)
         elif activation == 'sigmoid':
-            output = tf.nn.sigmoid(conv)
+            output = tf.nn.sigmoid(output)
         elif activation == 'linear':
-            output = conv
+            pass
 
         if keep_prob is not None:
             output = tf.nn.dropout(output, keep_prob)
@@ -260,16 +259,26 @@ def cnn(x, keep_prob):
     N = 200  # fully connected layer
     
     
-#    cl_1 = conv_layer('conv_layer_1', x, [6, 6, 1, K], stride=1)
-    cl_1 = Layer('conv_layer_1', x).conv([6, 6, 1, K]).activation().dropout()
+
+#    cl_1 = Layer('conv_layer_1',    x).conv([6, 6, 1, K], 1).batch_norm().activation().get()
+#    cl_2 = Layer('conv_layer_2', cl_1).conv([5, 5, K, L], 2).batch_norm().activation().get()
+#    cl_3 = Layer('conv_layer_3', cl_2).conv([4, 4, L, M], 2).batch_norm().activation().get()
+    cl_1 = conv_layer('conv_layer_1', x, [6, 6, 1, K], stride=1)
     cl_2 = conv_layer('conv_layer_2', cl_1 , [5, 5, K, L], stride=2)
     cl_3 = conv_layer('conv_layer_3', cl_2 , [4, 4, L, M], stride=2)
     
-    cl3_flattened = tf.reshape(cl_3, shape=[-1, 7 * 7 * M])
-    hl_1 = fully_connecter_layer('fully_connected_layer_1', cl3_flattened, 7 * 7 * M, N, 'relu', keep_prob)
+    cl_3_flattened = tf.reshape(cl_3, shape=[-1, 7 * 7 * M])
+    hl_1 = fully_connecter_layer('fully_connected_layer_1', cl_3_flattened, 7 * 7 * M, N, 'relu', keep_prob)
     output = fully_connecter_layer('output_layer', hl_1, N, 10, 'softmax')
     
-
+    print(x)
+    print(cl_1)
+    print(cl_2)
+    print(cl_3)
+    print(cl_3_flattened)
+    print(hl_1)
+    print(output)
+    
     return output
 
 
@@ -298,6 +307,8 @@ class LR():
         return self.min_lr + (self.max_lr - self.min_lr) * math.exp(-i * self.T)
     
 #%%
+
+tf.reset_default_graph()
 
 with tf.Graph().as_default():
     
