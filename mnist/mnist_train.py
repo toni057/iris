@@ -16,10 +16,12 @@ import tensorflow as tf
 
 import mnist_load
 
-#%% read in data
+
 
 filename_images = '/home/tb/Desktop/Data/mnist/train-images.idx3-ubyte'
 filename_labels = '/home/tb/Desktop/Data/mnist/train-labels.idx1-ubyte'
+
+#%% read in data
 
 data = mnist_load.Mnist(filename_images, filename_labels, labels_to_dummies = True)
 
@@ -258,7 +260,8 @@ def cnn(x, keep_prob):
     N = 200  # fully connected layer
     
     
-    cl_1 = conv_layer('conv_layer_1', x, [6, 6, 1, K], stride=1)
+#    cl_1 = conv_layer('conv_layer_1', x, [6, 6, 1, K], stride=1)
+    cl_1 = Layer('conv_layer_1', x).conv([6, 6, 1, K]).activation().dropout()
     cl_2 = conv_layer('conv_layer_2', cl_1 , [5, 5, K, L], stride=2)
     cl_3 = conv_layer('conv_layer_3', cl_2 , [4, 4, L, M], stride=2)
     
