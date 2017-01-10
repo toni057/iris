@@ -31,13 +31,13 @@ class Layer():
         # create the Tensor
         with tf.variable_scope(self.name):
             self.w = tf.get_variable(name='weights', 
-                                                     shape=w_shape,
-                                                     dtype=tf.float32,
-                                                     initializer=tf.truncated_normal_initializer(stddev=1.0 / math.sqrt(0.1)))
+                                     shape=w_shape,
+                                     dtype=tf.float32,
+                                     initializer=tf.truncated_normal_initializer(stddev=1.0 / math.sqrt(0.1)))
             self.b = tf.get_variable(name='bias',
-                                                     shape=b_shape,
-                                                     dtype=tf.float32,
-                                                     initializer = tf.constant_initializer(0.0))
+                                     shape=b_shape,
+                                     dtype=tf.float32,
+                                     initializer = tf.constant_initializer(0.0))
         return self
 
     
