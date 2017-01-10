@@ -42,6 +42,7 @@ class Layer():
 
     
     def conv(self, kernel, stride=1):
+        self.type = 'conv'
         with tf.variable_scope(self.name):
             self.add_layer(kernel=kernel)
             self.layer = tf.nn.conv2d(self.x, self.w, strides=[1, stride, stride, 1], padding='SAME') + self.b
@@ -49,20 +50,24 @@ class Layer():
         return self
         
     
-    def batch_norm(self):
-        with tf.variable_scope(self.name):
-            mean, variance = tf.nn.moments(self.layer, [0, 1, 2], name='moment')
-            self.layer=tf.nn.batch_normalization(self.layer, mean, variance, self.b, None, 1e-5, name='batch_norm')
-        print(self.layer)
-        return self
-        
-    
     def linear(self, in_dim, out_dim):
+        self.type = 'linear'
         with tf.variable_scope(self.name):
             self.add_layer(in_dim=in_dim, out_dim=out_dim)
             self.layer = tf.matmul(self.x, self.w) + self.b
         print(self.layer)
         return self
+
+        
+    def batch_norm(self):
+        axes = [0, 1, 2] if self.type == 'conv' else [0]
+        with tf.variable_scope(self.name):
+            mean, variance = tf.nn.moments(self.layer, axes, name='moment')
+            self.layer=tf.nn.batch_normalization(self.layer, mean, variance, self.b, None, 1e-5, name='batch_norm')
+        print(self.layer)
+        return self
+        
+    
         
     
     def activation(self, activation='relu'):
