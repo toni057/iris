@@ -15,34 +15,21 @@ import pandas as pd
 
 import matplotlib.pyplot as plt
 
+from abc import ABCMeta
 
 
 
-class Mnist():
+class Dataset():
     
-    def __init__(self, filename_images, filename_labels, labels_to_dummies = False):
+    def __init__(self, filename_images, filename_labels='', labels_to_dummies = False):
         self.input(filename_images, filename_labels)
         self.split_train_test()
         
         if labels_to_dummies:
             self.labels = pd.get_dummies(self.labels).as_matrix().astype(np.float32)
         
-    
     def input(self, filename_images, filename_labels):
-        # read images
-        with open(filename_images, 'rb') as f:
-            MSB_first, N, ROWS, COLS = struct.unpack(">IIII", f.read(16))
-            self.flat_images = np.fromfile(f, np.ubyte)
-            
-            self.images = self.flat_images.reshape([N, ROWS, COLS, 1])
-            self.flat_images = self.images.reshape([N, ROWS * COLS])
-            
-        # read labels
-        with open(filename_labels, 'rb') as f:
-            MSB_first, N = struct.unpack(">II", f.read(8))
-            self.labels = np.fromfile(f, np.ubyte)
-
-        self.size = len(self.labels)
+        pass
         
 
     def split_train_test(self, train_size=0.8):
@@ -98,6 +85,30 @@ class Mnist():
 
 
     def plot(self, i, revert = True):
+        pass
+
+
+
+class Mnist(Dataset):
+    
+    def input(self, filename_images, filename_labels):
+        # read images
+        with open(filename_images, 'rb') as f:
+            MSB_first, N, ROWS, COLS = struct.unpack(">IIII", f.read(16))
+            self.flat_images = np.fromfile(f, np.ubyte)
+            
+            self.images = self.flat_images.reshape([N, ROWS, COLS, 1])
+            self.flat_images = self.images.reshape([N, ROWS * COLS])
+            
+        # read labels
+        with open(filename_labels, 'rb') as f:
+            MSB_first, N = struct.unpack(">II", f.read(8))
+            self.labels = np.fromfile(f, np.ubyte)
+
+        self.size = len(self.labels)
+
+    
+    def plot(self, i, revert = True):
         """
         Plot  i-th image. 
         Revert - should colors be reverted (set to True for white background)
@@ -108,8 +119,59 @@ class Mnist():
         plt.show()
 
 
+        
+class Cifar(Dataset):
+    
+    ROWS = 32
+    COLS = 32
+    CHANNELS = 3
 
-#data = Mnist('train-images.idx3-ubyte', 'train-labels.idx1-ubyte')
+    def input(self, filename_images, filename_labels=''):
+        # read images
+        labels = []
+        img = []
+        
+#        ('./cifar/cifar-10-batches-py/data_batch_%d' %i)
+        
+        for i in range(1, 2):
+            filename_images = './cifar/cifar-10-batches-py/data_batch_%d' %i
+            
+            with open(filename_images, 'rb') as f:
+                for j in range(10000):
+                    row = struct.unpack(">3073B", f.read(1 + ROWS * COLS * CHANNELS))
+                    if j==789:
+                        break
+                    labels.append(row[0])
+#                    img.append(np.array(row[1:]).reshape([32, 32, 3]))
+                    img.append(np.array(row[1:]).reshape([3, 32, 32]).transpose([1, 2, 0]))
+            
+#            r = np.array(row[1:1025]).reshape([32, 32])
+#            g = np.array(row[1025:2049]).reshape([32, 32])
+#            b = np.array(row[2049:3073]).reshape([32, 32])
+            
+
+        self.labels = np.array(labels, dtype=np.uint8)
+        self.images = np.array(img)
+            
+
+    def plot(self, i):
+        """
+        Plot  i-th image. 
+        Revert - should colors be reverted (set to True for white background)
+        """
+        image = self.images[i,:,:,:]
+        plt.imshow(image.reshape([32, 32, 3]))
+        plt.show()
+
+
+
+plt.imshow(np.array(row[1:]).reshape([3, 32, 32]).transpose([1, 2, 0])[:,:,[2, 1, 0]])
+plt.show()
+
+
+data = Cifar('Data/data_batch_1')
+data.plot(789)
+#data = Mnist('Data/train-images.idx3-ubyte', 'Data/train-labels.idx1-ubyte')
 #images, labels = (data.images, data.labels)
 #data.plot(12)
 
