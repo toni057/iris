@@ -15,8 +15,6 @@ import pandas as pd
 
 import matplotlib.pyplot as plt
 
-from abc import ABCMeta
-
 
 
 class Dataset():
@@ -46,18 +44,27 @@ class Dataset():
             return self.flat_images[sample,:], self.labels[sample,:]
 
         
-    def get_train_data(self, train_only=True):
+    def get_train_data(self, flat = False, train_only=True):
         if self.tr_ind is None:
             self.split_train_test()
             
         if train_only:
-            return self.flat_images[self.tr_ind,:], self.labels[self.tr_ind,:]
+            if flat:
+                return self.flat_images[self.tr_ind,:], self.labels[self.tr_ind,:]
+            else:
+                return self.images[self.tr_ind,:,:,:], self.labels[self.tr_ind,:]
         else:
-            return self.flat_images, self.labels
+            if flat:
+                return self.flat_images, self.labels
+            else:
+                return self.images, self.labels
             
     
-    def get_test_data(self):
-        return self.flat_images[~self.tr_ind,:], self.labels[~self.tr_ind,:]
+    def get_test_data(self, flat = False):
+        if flat:
+            return self.flat_images[~self.tr_ind,:], self.labels[~self.tr_ind,:]
+        else:
+            return self.images[~self.tr_ind,:,:,:], self.labels[~self.tr_ind,:]
     
     
     # the *2 version return 2d images
@@ -129,29 +136,26 @@ class Cifar(Dataset):
     def input(self, filename_images, filename_labels=''):
         # read images
         labels = []
-        img = []
-        
-#        ('./cifar/cifar-10-batches-py/data_batch_%d' %i)
-        
-        for i in range(1, 2):
-            filename_images = './cifar/cifar-10-batches-py/data_batch_%d' %i
-            
-            with open(filename_images, 'rb') as f:
-                for j in range(10000):
-                    row = struct.unpack(">3073B", f.read(1 + ROWS * COLS * CHANNELS))
-                    if j==789:
-                        break
-                    labels.append(row[0])
-#                    img.append(np.array(row[1:]).reshape([32, 32, 3]))
-                    img.append(np.array(row[1:]).reshape([3, 32, 32]).transpose([1, 2, 0]))
-            
-#            r = np.array(row[1:1025]).reshape([32, 32])
-#            g = np.array(row[1025:2049]).reshape([32, 32])
-#            b = np.array(row[2049:3073]).reshape([32, 32])
-            
+        images = []
 
-        self.labels = np.array(labels, dtype=np.uint8)
-        self.images = np.array(img)
+        def unpickle(file):
+            import pickle
+            with open(file, 'rb') as file:
+                cifar_img = pickle.load(file, encoding ='bytes')
+            return cifar_img
+
+
+#        ('./cifar/cifar-10-batches-py/data_batch_%d' %i)
+        for i in range(1, 6):
+            
+            filename_image = 'C:\\Users\\Blaslov Toni\\Desktop\\Datasets\\cifar\\cifar-10-batches-py\\data_batch_%d' %i
+            img_dict = unpickle(filename_image)
+            labels.append(img_dict[b'labels'])
+            images.append(img_dict[b'data'].reshape([10000, 3, 32, 32]).transpose(0, 2, 3, 1))
+            
+            
+        self.labels = np.concatenate(labels, 0)
+        self.images = np.concatenate(images, 0)
             
 
     def plot(self, i):
@@ -160,18 +164,19 @@ class Cifar(Dataset):
         Revert - should colors be reverted (set to True for white background)
         """
         image = self.images[i,:,:,:]
-        plt.imshow(image.reshape([32, 32, 3]))
+        plt.imshow(image.reshape(32, 32, 3))
         plt.show()
 
 
 
-plt.imshow(np.array(row[1:]).reshape([3, 32, 32]).transpose([1, 2, 0])[:,:,[2, 1, 0]])
-plt.show()
+#data = Cifar('')
+#data.plot(792)
+#data.plot(789)
 
-
-data = Cifar('Data/data_batch_1')
-data.plot(789)
+#data = Cifar('Data/data_batch_1')
+#data.plot(789)
 #data = Mnist('Data/train-images.idx3-ubyte', 'Data/train-labels.idx1-ubyte')
 #images, labels = (data.images, data.labels)
 #data.plot(12)
+
 

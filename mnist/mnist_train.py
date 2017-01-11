@@ -8,7 +8,7 @@ based on google's tensorflow example
 """
 
 import os
-os.chdir('/home/tb/Desktop/Git/tensorflow/mnist')
+#os.chdir('/home/tb/Desktop/Git/tensorflow/mnist')
 
 import numpy as np
 import math
@@ -18,12 +18,13 @@ from mnist_load import Mnist
 from layer import Layer
 
 
-filename_images = '/home/tb/Desktop/Data/mnist/train-images.idx3-ubyte'
-filename_labels = '/home/tb/Desktop/Data/mnist/train-labels.idx1-ubyte'
+#filename_images = '/home/tb/Desktop/Data/mnist/train-images.idx3-ubyte'
+#filename_labels = '/home/tb/Desktop/Data/mnist/train-labels.idx1-ubyte'
 
 #%% read in data
 
 data = Mnist(filename_images, filename_labels, labels_to_dummies = True)
+#data = Cifar('', labels_to_dummies = True)
 
 
 #%% split to training and testing datasets
@@ -193,6 +194,32 @@ def loss(y, y_):
 #%% convolutional neural network for classifying mnist images
 
 
+class LR():
+    """
+    Learning rate class
+    
+    Parameters
+    ----------
+    min_lr : minimum learning rate value
+    max_lr : maximum learning rate value
+    T : time constant
+    """
+    def __init__(self, min_lr, max_lr, T):
+        self.min_lr = min_lr
+        self.max_lr = max_lr
+        self.T = T
+    
+    def get_lr(self, i):
+        """
+        Get the learning rate at iteration i.
+        Parameters
+        ----------
+        i : iteration
+        """
+        return self.min_lr + (self.max_lr - self.min_lr) * math.exp(-i * self.T)
+
+
+
 def conv_layer(name, x, filter_shape, stride=1, activation='relu', keep_prob=None, max_pool=True):
     """
     Create fully connected layer.
@@ -213,7 +240,6 @@ def conv_layer(name, x, filter_shape, stride=1, activation='relu', keep_prob=Non
         
         output = tf.nn.conv2d(x, w, strides=[1, stride, stride, 1], padding='SAME') + b
         
-#        with tf.device('/cpu:0'):
         mean, variance = tf.nn.moments(output, [0, 1, 2], name='moment')
         output = tf.nn.batch_normalization(output, mean, variance, b, None, 1e-5)
 
@@ -249,16 +275,19 @@ def cnn(x, keep_prob):
     
     
 
-    cl_1 = Layer('conv_layer_1',    x).conv([6, 6, 1, K], 1).batch_norm().activation().get()
-    cl_2 = Layer('conv_layer_2', cl_1).conv([5, 5, K, L], 2).batch_norm().activation().get()
-    cl_3 = Layer('conv_layer_3', cl_2).conv([4, 4, L, M], 2).batch_norm().activation().get()
-#    cl_1 = conv_layer('conv_layer_1', x, [6, 6, 1, K], stride=1)
-#    cl_2 = conv_layer('conv_layer_2', cl_1 , [5, 5, K, L], stride=2)
-#    cl_3 = conv_layer('conv_layer_3', cl_2 , [4, 4, L, M], stride=2)
+#    cl_1 = Layer('conv_layer_1',    x).conv([6, 6, 1, K], 1).batch_norm().activation().get()
+#    cl_2 = Layer('conv_layer_2', cl_1).conv([5, 5, K, L], 2).batch_norm().activation().get()
+#    cl_3 = Layer('conv_layer_3', cl_2).conv([4, 4, L, M], 2).batch_norm().activation().get()
+    cl_1 = conv_layer('conv_layer_1', x, [6, 6, 1, K], stride=1)
+    cl_2 = conv_layer('conv_layer_2', cl_1 , [5, 5, K, L], stride=2)
+    cl_3 = conv_layer('conv_layer_3', cl_2 , [4, 4, L, M], stride=2)
     
     cl_3_flattened = tf.reshape(cl_3, shape=[-1, 7 * 7 * M])
+#    cl_3_flattened = tf.reshape(cl_3, shape=[-1, 10 * 10 * M])
     hl_1 = fully_connecter_layer('fully_connected_layer_1', cl_3_flattened, 7 * 7 * M, N, 'relu', keep_prob)
+#    hl_1 = fully_connecter_layer('fully_connected_layer_1', cl_3_flattened, 10 * 10 * M, N, 'relu', keep_prob)
     output = fully_connecter_layer('output_layer', hl_1, N, 10, 'softmax')
+    
     
     print(x)
     print(cl_1)
@@ -271,40 +300,17 @@ def cnn(x, keep_prob):
     return output
 
 
-class LR():
-    """
-    Learning rate class
-    
-    Parameters
-    ----------
-    min_lr : minimum learning rate value
-    max_lr : maximum learning rate value
-    T : time constant
-    """
-    def __init__(self, min_lr, max_lr, T):
-        self.min_lr = min_lr
-        self.max_lr = max_lr
-        self.T = T
-    
-    def get_lr(self, i):
-        """
-        Get the learning rate at iteration i.
-        Parameters
-        ----------
-        i : iteration
-        """
-        return self.min_lr + (self.max_lr - self.min_lr) * math.exp(-i * self.T)
-    
 #%%
-
-tf.reset_default_graph()
 
 with tf.Graph().as_default():
     
     training_data, training_labels = data.get_train_data2()
+    H, W, C = training_data.shape[1:]
     
+    NUM_CLASES = training_labels.shape[1]
+
     with tf.device('/gpu:1'):
-        x = tf.placeholder(dtype=tf.float32, shape=[None, 28, 28, 1], name='x')
+        x = tf.placeholder(dtype=tf.float32, shape=[None, H, W, C], name='x')
         
         keep_prob = tf.placeholder(dtype=tf.float32, name='keep_prob')
         
@@ -312,7 +318,7 @@ with tf.Graph().as_default():
         y_conv = cnn(x, keep_prob)
         
         # Define loss and optimizer
-        y_ = tf.placeholder(dtype=tf.float32, shape=[None, training_labels.shape[1]], name='y_')
+        y_ = tf.placeholder(dtype=tf.float32, shape=[None, NUM_CLASES], name='y_')
     
         # learning rate placeholder
         lr = tf.placeholder(tf.float32, name='lr')
@@ -343,10 +349,9 @@ with tf.Graph().as_default():
                 train_accuracy = accuracy.eval(feed_dict={x:batch[0], y_: batch[1], keep_prob: 1})
                 print("step %d, training accuracy %g"%(i, train_accuracy))
             
-                print("test accuracy %g"%accuracy.eval(feed_dict={
-                    x: data.get_test_data2()[0], y_: data.get_test_data2()[1], keep_prob: 1}))
+#                print("test accuracy %g"%accuracy.eval(feed_dict={
+#                    x: data.get_test_data2()[0], y_: data.get_test_data2()[1], keep_prob: 1}))
 
             train_step.run(feed_dict={x: batch[0], y_: batch[1], lr: learning_rate.get_lr(i), keep_prob: 0.75})    
-    
-    
-    
+
+
