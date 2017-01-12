@@ -19,16 +19,17 @@ import matplotlib.pyplot as plt
 
 class Dataset():
     
-    def __init__(self, filename_images, filename_labels='', labels_to_dummies = False):
-        self.input(filename_images, filename_labels)
+    def __init__(self, labels_to_dummies = False, **kwargs):
+        if len(kwargs) == 1:
+            self.input(filename_images)
+        else:
+            self.input(filename_images, filename_labels)
+        
         self.split_train_test()
         
         if labels_to_dummies:
             self.labels = pd.get_dummies(self.labels).as_matrix().astype(np.float32)
-        
-    def input(self, filename_images, filename_labels):
-        pass
-        
+                
 
     def split_train_test(self, train_size=0.8):
         self.tr_ind = np.random.rand(len(self.labels)) < train_size
@@ -133,7 +134,7 @@ class Cifar(Dataset):
     COLS = 32
     CHANNELS = 3
 
-    def input(self, filename_images, filename_labels=''):
+    def input(self, filename_images):
         # read images
         labels = []
         images = []
@@ -148,7 +149,7 @@ class Cifar(Dataset):
 #        ('./cifar/cifar-10-batches-py/data_batch_%d' %i)
         for i in range(1, 6):
             
-            filename_image = 'C:\\Users\\Blaslov Toni\\Desktop\\Datasets\\cifar\\cifar-10-batches-py\\data_batch_%d' %i
+            filename_image = filename_images + 'data_batch_' + str(i)
             img_dict = unpickle(filename_image)
             labels.append(img_dict[b'labels'])
             images.append(img_dict[b'data'].reshape([10000, 3, 32, 32]).transpose(0, 2, 3, 1))

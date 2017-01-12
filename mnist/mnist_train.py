@@ -8,23 +8,27 @@ based on google's tensorflow example
 """
 
 import os
-#os.chdir('/home/tb/Desktop/Git/tensorflow/mnist')
+os.chdir('/home/tb/Desktop/Git/tensorflow/mnist')
 
 import numpy as np
 import math
 import tensorflow as tf
 
 from mnist_load import Mnist
+from mnist_load import Cifar
 from layer import Layer
 
 
-#filename_images = '/home/tb/Desktop/Data/mnist/train-images.idx3-ubyte'
-#filename_labels = '/home/tb/Desktop/Data/mnist/train-labels.idx1-ubyte'
+filename_images = '/home/tb/Desktop/Data/mnist/train-images.idx3-ubyte'
+filename_labels = '/home/tb/Desktop/Data/mnist/train-labels.idx1-ubyte'
+
+filename_images = '/home/tb/Desktop/Data/cifar/cifar-10-batches-py/'
+filename_labels = '/home/tb/Desktop/Data/cifar/cifar-10-batches-py/'
 
 #%% read in data
 
-data = Mnist(filename_images, filename_labels, labels_to_dummies = True)
-#data = Cifar('', labels_to_dummies = True)
+#data = Mnist(filename_images, filename_labels, labels_to_dummies = True)
+data = Cifar(filename_images=filename_images, labels_to_dummies = True)
 
 
 #%% split to training and testing datasets
@@ -251,13 +255,15 @@ def conv_layer(name, x, filter_shape, stride=1, activation='relu', keep_prob=Non
         elif activation == 'linear':
             pass
         
-        
+        print(output.get_shape())
         if max_pool:
-            output = tf.nn.max_pool(output, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
+            output = tf.nn.max_pool(output, ksize=[1, 3, 3, 1], strides=[1, 2, 2, 1], padding='SAME')
 
         if keep_prob is not None:
             output = tf.nn.dropout(output, keep_prob)
         
+        print(output.get_shape())
+            
     return output
 
 
@@ -268,24 +274,23 @@ def cnn(x, keep_prob):
     Output is linear.
     """
     
-    K = 6  # first convolutional layer output depth
-    L = 12  # second convolutional layer output depth
-    M = 24  # third convolutional layer output depth
-    N = 200  # fully connected layer
+    K = 50   # first convolutional layer output depth
+    L = 75   # second convolutional layer output depth
+    M = 100   # third convolutional layer output depth
+    N = 500  # fully connected layer
     
     
-
 #    cl_1 = Layer('conv_layer_1',    x).conv([6, 6, 1, K], 1).batch_norm().activation().get()
 #    cl_2 = Layer('conv_layer_2', cl_1).conv([5, 5, K, L], 2).batch_norm().activation().get()
 #    cl_3 = Layer('conv_layer_3', cl_2).conv([4, 4, L, M], 2).batch_norm().activation().get()
-    cl_1 = conv_layer('conv_layer_1', x, [6, 6, 1, K], stride=1)
-    cl_2 = conv_layer('conv_layer_2', cl_1 , [5, 5, K, L], stride=2)
-    cl_3 = conv_layer('conv_layer_3', cl_2 , [4, 4, L, M], stride=2)
+    cl_1 = conv_layer('conv_layer_1', x, [6, 6, 3, K], stride=1, max_pool=False)
+    cl_2 = conv_layer('conv_layer_2', cl_1 , [5, 5, K, L], stride=2, keep_prob=0.75, max_pool=False)
+    cl_3 = conv_layer('conv_layer_3', cl_2 , [4, 4, L, M], stride=2, keep_prob=0.75, max_pool=False)
     
-    cl_3_flattened = tf.reshape(cl_3, shape=[-1, 7 * 7 * M])
-#    cl_3_flattened = tf.reshape(cl_3, shape=[-1, 10 * 10 * M])
-    hl_1 = fully_connecter_layer('fully_connected_layer_1', cl_3_flattened, 7 * 7 * M, N, 'relu', keep_prob)
-#    hl_1 = fully_connecter_layer('fully_connected_layer_1', cl_3_flattened, 10 * 10 * M, N, 'relu', keep_prob)
+#    cl_3_flattened = tf.reshape(cl_3, shape=[-1, 7 * 7 * M])
+    cl_3_flattened = tf.reshape(cl_3, shape=[-1, 8 * 8 * M])
+#    hl_1 = fully_connecter_layer('fully_connected_layer_1', cl_3_flattened, 7 * 7 * M, N, 'relu', keep_prob)
+    hl_1 = fully_connecter_layer('fully_connected_layer_1', cl_3_flattened, 8 * 8 * M, N, 'relu', keep_prob)
     output = fully_connecter_layer('output_layer', hl_1, N, 10, 'softmax')
     
     
@@ -345,12 +350,12 @@ with tf.Graph().as_default():
         for i in range(10000):
             batch = data.get_random_sample2()
             
-            if i % 100 == 0:
+            if i % 200 == 0:
                 train_accuracy = accuracy.eval(feed_dict={x:batch[0], y_: batch[1], keep_prob: 1})
-                print("step %d, training accuracy %g"%(i, train_accuracy))
+                print("step %d, training accuracy %.3g"%(i, train_accuracy))
             
-#                print("test accuracy %g"%accuracy.eval(feed_dict={
-#                    x: data.get_test_data2()[0], y_: data.get_test_data2()[1], keep_prob: 1}))
+                print("test accuracy %.3g"%accuracy.eval(feed_dict={
+                    x: data.get_test_data2()[0], y_: data.get_test_data2()[1], keep_prob: 1}))
 
             train_step.run(feed_dict={x: batch[0], y_: batch[1], lr: learning_rate.get_lr(i), keep_prob: 0.75})    
 
