@@ -21,9 +21,9 @@ class Dataset():
     
     def __init__(self, labels_to_dummies = False, **kwargs):
         if len(kwargs) == 1:
-            self.input(filename_images)
+            self.input(kwargs['filename_images'])
         else:
-            self.input(filename_images, filename_labels)
+            self.input(kwargs['filename_images'], kwargs['filename_labels'])
         
         self.split_train_test()
         
@@ -99,6 +99,10 @@ class Dataset():
 
 class Mnist(Dataset):
     
+    ROWS = 28
+    COLS = 28
+    CHANNELS = 1
+    
     def input(self, filename_images, filename_labels):
         # read images
         with open(filename_images, 'rb') as f:
@@ -145,10 +149,9 @@ class Cifar(Dataset):
                 cifar_img = pickle.load(file, encoding ='bytes')
             return cifar_img
 
-
-#        ('./cifar/cifar-10-batches-py/data_batch_%d' %i)
+        # load batches
         for i in range(1, 6):
-            
+
             filename_image = filename_images + 'data_batch_' + str(i)
             img_dict = unpickle(filename_image)
             labels.append(img_dict[b'labels'])
