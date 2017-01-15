@@ -22,13 +22,13 @@ from layer import Layer
 filename_images = '/home/tb/Desktop/Data/mnist/train-images.idx3-ubyte'
 filename_labels = '/home/tb/Desktop/Data/mnist/train-labels.idx1-ubyte'
 
-filename_images = '/home/tb/Desktop/Data/cifar/cifar-10-batches-py/'
-filename_labels = '/home/tb/Desktop/Data/cifar/cifar-10-batches-py/'
+#filename_images = '/home/tb/Desktop/Data/cifar/cifar-10-batches-py/'
+#filename_labels = '/home/tb/Desktop/Data/cifar/cifar-10-batches-py/'
 
 #%% read in data
 
-#data = Mnist(filename_images, filename_labels, labels_to_dummies = True)
-data = Cifar(filename_images=filename_images, labels_to_dummies = True)
+data = Mnist(filename_images=filename_images, filename_labels=filename_labels, labels_to_dummies = True)
+#data = Cifar(filename_images=filename_images, labels_to_dummies = True)
 
 
 #%% split to training and testing datasets
@@ -131,12 +131,6 @@ def simple_nnet(x):
     return y
 
 
-def loss(y, y_):
-    cross_entropy = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(y, y_))
-    loss = tf.reduce_mean(cross_entropy, name='xentropy_mean')
-    return loss
-
-    
 
 #%% Define the graph and run
 
@@ -197,16 +191,46 @@ def loss(y, y_):
 
 #%% convolutional neural network for classifying mnist images
 
+def loss(y, y_):
+    """ Loss function
+    
+    Args:
+        y: logits
+        y_: labels (each observation is encoded as a vector)
+        
+    Returns:
+        Softmax cross entropy tensor.
+    """
+    cross_entropy = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(y_conv, y_), name='xentropy_mean')
+    
+    return cross_entropy
+
+
+def acc(y, y_):
+    """ Accuracy
+    
+    Args:
+        y: logits
+        y_: labels
+        
+    Returns:
+        Accuracy - num of correctly classified pieces / total number of obs
+    """
+    
+    # accuracy (num of correctly classified pieces / total number of obs)
+    correct_prediction = tf.equal(tf.argmax(y_conv,1), tf.argmax(y_,1))
+    accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
+    
+    return accuracy
+
 
 class LR():
-    """
-    Learning rate class
+    """Learning rate class
     
-    Parameters
-    ----------
-    min_lr : minimum learning rate value
-    max_lr : maximum learning rate value
-    T : time constant
+    Args:
+        min_lr: minimum learning rate value
+        max_lr: maximum learning rate value
+        T: time constant
     """
     def __init__(self, min_lr, max_lr, T):
         self.min_lr = min_lr
@@ -214,32 +238,36 @@ class LR():
         self.T = T
     
     def get_lr(self, i):
-        """
-        Get the learning rate at iteration i.
-        Parameters
-        ----------
-        i : iteration
+        """Get the learning rate at iteration i.
+        Args:
+            i: i-th iteration at which to calculate the learning rate..
+        
+        Returns:
+            Learning rate tensor at iteration i.
         """
         return self.min_lr + (self.max_lr - self.min_lr) * math.exp(-i * self.T)
 
 
 
-def conv_layer(name, x, filter_shape, stride=1, activation='relu', keep_prob=None, max_pool=True):
-    """
-    Create fully connected layer.
+def conv_layer(name, x, kernel, stride=1, activation='relu', keep_prob=None, max_pool=False):
+    """Create a 2d conv layer connected layer.
     
-    filter_shape
-    x
-    name
-    stride
-    keep_prob
+    Args:
+        name: name
+        kernel: kernel shape
+        x: input tensor
+        stride: stride
+        keep_prob: probability to keep the link. P(dropout) = 1-keeo_prob
+    
+    Returns:
+        Variable tensor, 2d convolution output.
     """
     with tf.variable_scope(name):
         w = create_variable_on_cpu(name='weights', 
-                            shape=filter_shape,
+                            shape=kernel,
                             initializer=tf.truncated_normal_initializer(stddev=0.1))
         b = create_variable_on_cpu(name='bias',
-                            shape = filter_shape[3],
+                            shape = kernel[3],
                             initializer = tf.constant_initializer(0.0))
         
         output = tf.nn.conv2d(x, w, strides=[1, stride, stride, 1], padding='SAME') + b
@@ -255,54 +283,50 @@ def conv_layer(name, x, filter_shape, stride=1, activation='relu', keep_prob=Non
         elif activation == 'linear':
             pass
         
-        print(output.get_shape())
         if max_pool:
             output = tf.nn.max_pool(output, ksize=[1, 3, 3, 1], strides=[1, 2, 2, 1], padding='SAME')
 
         if keep_prob is not None:
             output = tf.nn.dropout(output, keep_prob)
         
-        print(output.get_shape())
+#        print(output.get_shape())
             
     return output
 
 
 def cnn(x, keep_prob):
+    """Build the convolutional neural net.
+    
+    Args:
+        x: input tensor
+        keep_prob: probability to keep the link. P(dropout) = 1-keeo_prob
     """
-    Build the convolutional neural net.
+    K = 6    # first convolutional layer output depth
+    L = 12   # second convolutional layer output depth
+    M = 24   # third convolutional layer output depth
+    N = 100  # fully connected layer
     
-    Output is linear.
-    """
+    # C - channels
+    C = x.get_shape()[3]
     
-    K = 50   # first convolutional layer output depth
-    L = 75   # second convolutional layer output depth
-    M = 100   # third convolutional layer output depth
-    N = 500  # fully connected layer
+    with tf.variable_scope('conv_layer_1'):
+        cl_1 = Layer('conv_layer_1', x).conv([6, 6, C, K], stride=1).batch_norm().activation().get()
     
+    with tf.variable_scope('conv_layer_2'):
+        cl_2 = Layer('conv_layer_2', cl_1).conv([5, 5, K, L], stride=2).batch_norm().activation().get()
     
-#    cl_1 = Layer('conv_layer_1',    x).conv([6, 6, 1, K], 1).batch_norm().activation().get()
-#    cl_2 = Layer('conv_layer_2', cl_1).conv([5, 5, K, L], 2).batch_norm().activation().get()
-#    cl_3 = Layer('conv_layer_3', cl_2).conv([4, 4, L, M], 2).batch_norm().activation().get()
-    cl_1 = conv_layer('conv_layer_1', x, [6, 6, 3, K], stride=1, max_pool=False)
-    cl_2 = conv_layer('conv_layer_2', cl_1 , [5, 5, K, L], stride=2, keep_prob=0.75, max_pool=False)
-    cl_3 = conv_layer('conv_layer_3', cl_2 , [4, 4, L, M], stride=2, keep_prob=0.75, max_pool=False)
-    
-#    cl_3_flattened = tf.reshape(cl_3, shape=[-1, 7 * 7 * M])
-    cl_3_flattened = tf.reshape(cl_3, shape=[-1, 8 * 8 * M])
-#    hl_1 = fully_connecter_layer('fully_connected_layer_1', cl_3_flattened, 7 * 7 * M, N, 'relu', keep_prob)
-    hl_1 = fully_connecter_layer('fully_connected_layer_1', cl_3_flattened, 8 * 8 * M, N, 'relu', keep_prob)
-    output = fully_connecter_layer('output_layer', hl_1, N, 10, 'softmax')
-    
-    
-    print(x)
-    print(cl_1)
-    print(cl_2)
-    print(cl_3)
-    print(cl_3_flattened)
-    print(hl_1)
-    print(output)
+    with tf.variable_scope('conv_layer_3'):
+        cl_3 = Layer('conv_layer_3', cl_2).conv([4, 4, L, M], stride=2).batch_norm().activation().get()
+        cl_3_flattened = tf.reshape(cl_3, shape=[-1, 7 * 7 * M])
+        
+    with tf.variable_scope('fully_connected_layer_1'):
+        hl_1 = Layer('fully_connected_layer_1', cl_3_flattened).linear(7 * 7 * M, N).batch_norm().activation('relu').dropout(0.75).get()
+
+    with tf.variable_scope('output'):
+        output = Layer('output', hl_1).linear(N, 10).activation('linear').dropout(0.75).get()
     
     return output
+
 
 
 #%%
@@ -310,6 +334,7 @@ def cnn(x, keep_prob):
 with tf.Graph().as_default():
     
     training_data, training_labels = data.get_train_data2()
+    # H: height, W: width, C: channels
     H, W, C = training_data.shape[1:]
     
     NUM_CLASES = training_labels.shape[1]
@@ -328,21 +353,25 @@ with tf.Graph().as_default():
         # learning rate placeholder
         lr = tf.placeholder(tf.float32, name='lr')
     
-        cross_entropy = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(y_conv, y_))
+        # loss
+        cross_entropy = loss(y_conv, y_)
+        
+        # optimizer
         train_step = tf.train.AdamOptimizer(lr).minimize(cross_entropy)
-        correct_prediction = tf.equal(tf.argmax(y_conv,1), tf.argmax(y_,1))
-        accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
-    
+        
+        # calculate accuracy
+        accuracy = acc(y_conv, y_)
 
     # learning rate parameters
-    max_lr = 0.0001
-    min_lr = 0.00001
+    max_lr = 0.001
+    min_lr = 0.0001
     T = 0.0005
     learning_rate = LR(min_lr, max_lr, T)
     
     # add soft placement for sessions (specifically to solve gpu placement issue of tf.nn.moments)
     config = tf.ConfigProto(allow_soft_placement=True)
-    # create a session and run session to initialize variables
+    
+    # create a session and run the optimisation
     with tf.Session(config=config) as sess:
         
         sess.run(tf.global_variables_initializer())
