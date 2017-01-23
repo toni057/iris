@@ -2,6 +2,13 @@ import tensorflow as tf
 import math
 
 #%%
+
+def create_variable_on_cpu(name, shape, dtype, initializer):
+    with tf.device('/cpu:0'):
+        var = tf.get_variable(name, shape, initializer=initializer, dtype=tf.float32)
+    return var
+        
+        
 class Layer():
     
     def get(self):
@@ -13,12 +20,6 @@ class Layer():
         self.x = x
 
     
-    def create_variable_on_cpu(self, name, shape, initializer, dtype):
-        with tf.device('/cpu:0'):
-            var = tf.get_variable(name, shape, initializer=initializer, dtype=tf.float32)
-        return var
-
-
     def add_layer(self, **kwargs):
         # sort out in and out dimensions
         if len(kwargs) == 1:
@@ -28,12 +29,12 @@ class Layer():
             w_shape = [kwargs['in_dim'], kwargs['out_dim']]
             b_shape = kwargs['out_dim']
 
-        self.w = tf.get_variable(name='weights', 
+        self.w = create_variable_on_cpu(name='weights', 
                                  shape=w_shape,
                                  dtype=tf.float32,
                                  initializer=tf.truncated_normal_initializer(stddev=1.0 / math.sqrt(0.1)))
         
-        self.b = tf.get_variable(name='bias',
+        self.b = create_variable_on_cpu(name='bias',
                                  shape=b_shape,
                                  dtype=tf.float32,
                                  initializer = tf.constant_initializer(0.0))
@@ -43,7 +44,7 @@ class Layer():
     def conv(self, kernel, stride=1):
         self.type = 'conv'
         self.add_layer(kernel=kernel)
-        self.layer = tf.nn.conv2d(self.x, self.w, strides=[1, stride, stride, 1], padding='SAME') + self.b
+        self.layer = tf.nn.conv2d(self.x, self.w, strides=[1, stride, stride, 1], padding='VALID') + self.b
         return self
         
     
